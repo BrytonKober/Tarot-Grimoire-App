@@ -14,7 +14,7 @@ import {
   DragStartEvent,
 } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
-import { Menu, BookOpen, LayoutGrid, Save } from 'lucide-react';
+import { Menu, BookOpen, LayoutGrid, Save, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 
 import { Placeholder, Spread, TarotCard } from './types';
 import { TAROT_DECK } from './lib/deck';
@@ -39,6 +39,8 @@ export default function App() {
   const [showTutorial, setShowTutorial] = useState(() => {
     return localStorage.getItem('tarot-tutorial-seen') !== 'true';
   });
+  const [zoom, setZoom] = useState(1);
+  const currentCellSize = 80 * zoom;
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [dragDelta, setDragDelta] = useState<{x: number, y: number} | null>(null);
@@ -119,8 +121,8 @@ export default function App() {
       const visibleCenterX = (mainRect.left + mainRect.width / 2) - canvasRect.left;
       const visibleCenterY = (mainRect.top + mainRect.height / 2) - canvasRect.top;
 
-      startX = visibleCenterX / 80 - 1;
-      startY = visibleCenterY / 80 - 1.5;
+      startX = visibleCenterX / currentCellSize - 1;
+      startY = visibleCenterY / currentCellSize - 1.5;
 
       // Keep within bounds
       startX = Math.max(0, Math.min(startX, GRID_WIDTH - 2));
@@ -176,8 +178,8 @@ export default function App() {
     setCards((prev) =>
       prev.map((c) => {
         if (selectedIds.has(c.id)) {
-          let newX = c.x + delta.x / 80;
-          let newY = c.y + delta.y / 80;
+          let newX = c.x + delta.x / currentCellSize;
+          let newY = c.y + delta.y / currentCellSize;
           newX = Math.max(0, Math.min(newX, GRID_WIDTH - (c.rotationMode === 'horizontal' ? c.height : c.width)));
           newY = Math.max(0, Math.min(newY, GRID_HEIGHT - (c.rotationMode === 'horizontal' ? c.width : c.height)));
           return { ...c, x: newX, y: newY };
@@ -444,35 +446,62 @@ export default function App() {
             />
           </div>
 
-          <main id="main-scroll-area" className="flex-1 overflow-auto relative z-0">
-            <div className="min-w-full min-h-full w-max h-max p-4 md:p-8 flex">
-              <div className="m-auto">
-                <DndContext
-                  sensors={sensors}
-                  collisionDetection={closestCenter}
-                  onDragStart={handleDragStart}
-                  onDragMove={handleDragMove}
-                  onDragEnd={handleDragEnd}
-                  modifiers={[restrictToWindowEdges]}
-                >
-                  <GridCanvas
-                    cards={cards}
-                    cellSize={80}
-                    width={GRID_WIDTH}
-                    height={GRID_HEIGHT}
-                    onUpdateCard={handleUpdateCard}
-                    onDeleteCard={handleDeleteCard}
-                    selectedIds={selectedIds}
-                    activeId={activeId}
-                    dragDelta={dragDelta}
-                    onCardClick={handleCardClick}
-                    onClearSelection={handleClearSelection}
-                    onSetSelection={handleSetSelection}
-                  />
-                </DndContext>
+          <div className="relative flex-1 flex flex-col overflow-hidden">
+            <main id="main-scroll-area" className="flex-1 overflow-auto relative z-0">
+              <div className="min-w-full min-h-full w-max h-max p-4 md:p-8 flex">
+                <div className="m-auto">
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
+                    onDragMove={handleDragMove}
+                    onDragEnd={handleDragEnd}
+                    modifiers={[restrictToWindowEdges]}
+                  >
+                    <GridCanvas
+                      cards={cards}
+                      cellSize={currentCellSize}
+                      width={GRID_WIDTH}
+                      height={GRID_HEIGHT}
+                      onUpdateCard={handleUpdateCard}
+                      onDeleteCard={handleDeleteCard}
+                      selectedIds={selectedIds}
+                      activeId={activeId}
+                      dragDelta={dragDelta}
+                      onCardClick={handleCardClick}
+                      onClearSelection={handleClearSelection}
+                      onSetSelection={handleSetSelection}
+                    />
+                  </DndContext>
+                </div>
               </div>
+            </main>
+
+            {/* Zoom Controls */}
+            <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-10">
+              <button 
+                onClick={() => setZoom(z => Math.min(z + 0.2, 2))}
+                className="p-3 bg-white text-slate-700 hover:bg-slate-50 rounded-full shadow-lg border border-slate-200 transition-colors"
+                title="Zoom In"
+              >
+                <ZoomIn size={20} />
+              </button>
+              <button 
+                onClick={() => setZoom(1)}
+                className="p-3 bg-white text-slate-700 hover:bg-slate-50 rounded-full shadow-lg border border-slate-200 transition-colors"
+                title="Reset Zoom"
+              >
+                <Maximize size={20} />
+              </button>
+              <button 
+                onClick={() => setZoom(z => Math.max(z - 0.2, 0.4))}
+                className="p-3 bg-white text-slate-700 hover:bg-slate-50 rounded-full shadow-lg border border-slate-200 transition-colors"
+                title="Zoom Out"
+              >
+                <ZoomOut size={20} />
+              </button>
             </div>
-          </main>
+          </div>
         </div>
       )}
     </div>
