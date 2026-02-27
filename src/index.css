@@ -1,0 +1,101 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  @keyframes jiggle {
+    0% { transform: rotate(0deg) scale(1); }
+    25% { transform: rotate(-12deg) scale(1.1); }
+    50% { transform: rotate(12deg) scale(1.1); }
+    75% { transform: rotate(-12deg) scale(1.1); }
+    100% { transform: rotate(0deg) scale(1.1); }
+  }
+  
+  .hover-jiggle:hover {
+    animation: jiggle 0.4s ease-in-out forwards;
+  }
+
+  /* Tippy.js Overrides for Slash Command */
+  .tippy-box[data-theme~='slash-command'] {
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    z-index: 50 !important;
+  }
+  .tippy-box[data-theme~='slash-command'] .tippy-content {
+    padding: 0 !important;
+  }
+  .tippy-box[data-theme~='slash-command'] .tippy-arrow {
+    display: none !important;
+  }
+}
+
+/* Tiptap Editor Styles */
+.ProseMirror {
+  outline: none;
+}
+
+.ProseMirror > * + * {
+  margin-top: 0.75em;
+}
+
+.ProseMirror p {
+  margin-bottom: 0.5em;
+  line-height: 1.6;
+  color: #334155;
+}
+
+.ProseMirror h1, .ProseMirror h2, .ProseMirror h3 {
+  line-height: 1.2;
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror h1 { font-size: 2.25rem; }
+.ProseMirror h2 { font-size: 1.875rem; }
+.ProseMirror h3 { font-size: 1.5rem; }
+
+.ProseMirror ul, .ProseMirror ol {
+  padding: 0 1rem;
+  margin-bottom: 0.5em;
+}
+
+.ProseMirror ul { list-style-type: disc; }
+.ProseMirror ol { list-style-type: decimal; }
+
+.ProseMirror li p {
+  margin-top: 0.25em;
+  margin-bottom: 0.25em;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid #cbd5e1;
+  padding-left: 1rem;
+  font-style: italic;
+  color: #64748b;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+.ProseMirror hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 2rem 0;
+}
+
+/* Placeholder */
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #94a3b8;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
