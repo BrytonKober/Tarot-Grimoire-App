@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { useDroppable } from '@dnd-kit/core';
+import { useGesture } from '@use-gesture/react';
 import { Placeholder } from '../types';
 import { CardPlaceholder } from './CardPlaceholder';
 import { cn } from '../lib/utils';
@@ -7,8 +8,6 @@ import { cn } from '../lib/utils';
 interface GridCanvasProps {
   cards: Placeholder[];
   cellSize: number;
-  width: number;
-  height: number;
   onUpdateCard: (id: string, updates: Partial<Placeholder>) => void;
   onDeleteCard: (id: string) => void;
   selectedIds: Set<string>;
@@ -17,115 +16,117 @@ interface GridCanvasProps {
   onCardClick: (id: string, ctrlKey: boolean) => void;
   onClearSelection: () => void;
   onSetSelection: (ids: Set<string>) => void;
+  zoom: number;
+  setZoom: (zoom: number | ((z: number) => number)) => void;
+  pan: { x: number, y: number };
+  setPan: (pan: { x: number, y: number } | ((p: { x: number, y: number }) => { x: number, y: number })) => void;
 }
 
 export function GridCanvas({ 
-  cards, cellSize, width, height, onUpdateCard, onDeleteCard,
-  selectedIds, activeId, dragDelta, onCardClick, onClearSelection, onSetSelection
+  cards, cellSize, onUpdateCard, onDeleteCard,
+  selectedIds, activeId, dragDelta, onCardClick, onClearSelection, onSetSelection,
+  zoom, setZoom, pan, setPan
 }: GridCanvasProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: 'grid-canvas',
   });
 
-  const [selectionBox, setSelectionBox] = useState<{startX: number, startY: number, currentX: number, currentY: number} | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      if (!e.ctrlKey && !e.metaKey) {
-        onClearSelection();
-      }
-      
-      // Disable marquee selection on touch devices to allow native scrolling
-      if (e.pointerType === 'touch') return;
-
-      e.currentTarget.setPointerCapture(e.pointerId);
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      setSelectionBox({ startX: x, startY: y, currentX: x, currentY: y });
-    }
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (selectionBox) {
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      setSelectionBox(prev => prev ? { ...prev, currentX: x, currentY: y } : null);
-    }
-  };
-
-  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (selectionBox) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-      
-      const left = Math.min(selectionBox.startX, selectionBox.currentX);
-      const right = Math.max(selectionBox.startX, selectionBox.currentX);
-      const top = Math.min(selectionBox.startY, selectionBox.currentY);
-      const bottom = Math.max(selectionBox.startY, selectionBox.currentY);
-
-      const newSelected = new Set(selectedIds);
-      if (!e.ctrlKey && !e.metaKey) {
-        newSelected.clear();
-      }
-
-      cards.forEach(card => {
-        const cardLeft = card.x * cellSize;
-        const cardTop = card.y * cellSize;
-        const cardRight = cardLeft + (card.rotationMode === 'horizontal' ? card.height : card.width) * cellSize;
-        const cardBottom = cardTop + (card.rotationMode === 'horizontal' ? card.width : card.height) * cellSize;
-
-        if (cardLeft < right && cardRight > left && cardTop < bottom && cardBottom > top) {
-          newSelected.add(card.id);
+  useGesture({
+    onDrag: ({ offset: [x, y], event }) => {
+      // Ignore if dragging a card
+      if ((event.target as HTMLElement).closest('.card-element')) return;
+      setPan({ x, y });
+    },
+    onWheel: ({ event, delta: [dx, dy], ctrlKey }) => {
+      event.preventDefault();
+      if (ctrlKey) {
+        // Zoom
+        const zoomDelta = -dy * 0.01;
+        const newZoom = Math.max(0.1, Math.min(zoom + zoomDelta, 3));
+        
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          const pointerX = event.clientX - rect.left;
+          const pointerY = event.clientY - rect.top;
+          
+          const scaleRatio = newZoom / zoom;
+          const newPanX = pointerX - (pointerX - pan.x) * scaleRatio;
+          const newPanY = pointerY - (pointerY - pan.y) * scaleRatio;
+          
+          setZoom(newZoom);
+          setPan({ x: newPanX, y: newPanY });
         }
-      });
-
-      onSetSelection(newSelected);
-      setSelectionBox(null);
+      } else {
+        // Pan
+        setPan(p => ({ x: p.x - dx, y: p.y - dy }));
+      }
+    },
+    onPinch: ({ origin: [ox, oy], offset: [scale], event }) => {
+      if (event) event.preventDefault();
+      
+      const newZoom = Math.max(0.1, Math.min(scale, 3));
+      
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const pointerX = ox - rect.left;
+        const pointerY = oy - rect.top;
+        
+        const scaleRatio = newZoom / zoom;
+        const newPanX = pointerX - (pointerX - pan.x) * scaleRatio;
+        const newPanY = pointerY - (pointerY - pan.y) * scaleRatio;
+        
+        setZoom(newZoom);
+        setPan({ x: newPanX, y: newPanY });
+      }
     }
+  }, {
+    target: containerRef,
+    eventOptions: { passive: false },
+    drag: { filterTaps: true, from: () => [pan.x, pan.y] },
+    pinch: { scaleBounds: { min: 0.1, max: 3 }, modifierKey: null, from: () => [zoom, 0] }
+  });
+
+  const setRefs = (node: HTMLDivElement | null) => {
+    containerRef.current = node;
+    setNodeRef(node);
   };
 
   return (
     <div
-      ref={setNodeRef}
-      id="grid-canvas"
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
+      ref={setRefs}
       className={cn(
-        "relative bg-slate-50 border-2 border-slate-200 rounded-2xl overflow-hidden shadow-inner transition-colors",
-        isOver && "bg-indigo-50/50 border-indigo-200"
+        "w-full h-full overflow-hidden bg-slate-50 relative touch-none transition-colors",
+        isOver && "bg-indigo-50/50"
       )}
-      style={{
-        width: width * cellSize,
-        height: height * cellSize,
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClearSelection();
+        }
       }}
     >
-      {cards.map((card) => (
-        <CardPlaceholder
-          key={card.id}
-          card={card}
-          cellSize={cellSize}
-          isSelected={selectedIds.has(card.id)}
-          isActive={activeId === card.id}
-          dragDelta={dragDelta}
-          onUpdate={onUpdateCard}
-          onDelete={onDeleteCard}
-          onClick={(e) => onCardClick(card.id, e.ctrlKey || e.metaKey)}
-        />
-      ))}
-      
-      {selectionBox && (
-        <div 
-          className="absolute border-2 border-indigo-500 bg-indigo-500/20 pointer-events-none z-[1000]"
-          style={{
-            left: Math.min(selectionBox.startX, selectionBox.currentX),
-            top: Math.min(selectionBox.startY, selectionBox.currentY),
-            width: Math.abs(selectionBox.currentX - selectionBox.startX),
-            height: Math.abs(selectionBox.currentY - selectionBox.startY),
-          }}
-        />
-      )}
+      <div
+        className="absolute origin-top-left"
+        style={{
+          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+        }}
+      >
+        {cards.map((card) => (
+          <CardPlaceholder
+            key={card.id}
+            card={card}
+            cellSize={cellSize}
+            isSelected={selectedIds.has(card.id)}
+            isActive={activeId === card.id}
+            dragDelta={dragDelta}
+            onUpdate={onUpdateCard}
+            onDelete={onDeleteCard}
+            onClick={(e) => onCardClick(card.id, e.ctrlKey || e.metaKey)}
+            zoom={zoom}
+          />
+        ))}
+      </div>
     </div>
   );
 }

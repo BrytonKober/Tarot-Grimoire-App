@@ -40,7 +40,8 @@ export default function App() {
     return localStorage.getItem('tarot-tutorial-seen') !== 'true';
   });
   const [zoom, setZoom] = useState(1);
-  const currentCellSize = 80 * zoom;
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const currentCellSize = 80; // Cell size is constant internally, scaled by zoom
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [dragDelta, setDragDelta] = useState<{x: number, y: number} | null>(null);
@@ -55,12 +56,10 @@ export default function App() {
       
       // If no past readings and tutorial hasn't been seen, add a default card
       if (all.length === 0 && showTutorial && cards.length === 0) {
-        const startX = Math.floor(GRID_WIDTH / 2) - 1;
-        const startY = Math.floor(GRID_HEIGHT / 2) - 1.5;
         setCards([{
           id: uuidv4(),
-          x: startX,
-          y: startY,
+          x: -1,
+          y: -1.5,
           width: 2,
           height: 3,
           rotationMode: 'vertical',
@@ -72,15 +71,18 @@ export default function App() {
     loadReadings();
   }, []);
 
-  // Scroll to center on initial load
+  // Center on initial load
   useEffect(() => {
     if (currentView === 'tarot') {
-      // Small delay to ensure DOM is fully rendered
       const timeoutId = setTimeout(() => {
-        const main = document.getElementById('main-scroll-area');
-        if (main) {
-          main.scrollTop = (main.scrollHeight - main.clientHeight) / 2;
-          main.scrollLeft = (main.scrollWidth - main.clientWidth) / 2;
+        const container = document.getElementById('canvas-container');
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          // Center the origin (0,0) in the middle of the screen
+          setPan({
+            x: rect.width / 2,
+            y: rect.height / 2
+          });
         }
       }, 100);
       return () => clearTimeout(timeoutId);
@@ -107,26 +109,19 @@ export default function App() {
   );
 
   const handleAddCard = () => {
-    let startX = Math.floor(GRID_WIDTH / 2) - 1;
-    let startY = Math.floor(GRID_HEIGHT / 2) - 1.5;
+    let startX = 0;
+    let startY = 0;
 
-    const canvas = document.getElementById('grid-canvas');
-    const main = document.getElementById('main-scroll-area');
+    const container = document.getElementById('canvas-container');
 
-    if (canvas && main) {
-      const canvasRect = canvas.getBoundingClientRect();
-      const mainRect = main.getBoundingClientRect();
+    if (container) {
+      const rect = container.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
 
-      // Calculate the center of the visible area relative to the canvas
-      const visibleCenterX = (mainRect.left + mainRect.width / 2) - canvasRect.left;
-      const visibleCenterY = (mainRect.top + mainRect.height / 2) - canvasRect.top;
-
-      startX = visibleCenterX / currentCellSize - 1;
-      startY = visibleCenterY / currentCellSize - 1.5;
-
-      // Keep within bounds
-      startX = Math.max(0, Math.min(startX, GRID_WIDTH - 2));
-      startY = Math.max(0, Math.min(startY, GRID_HEIGHT - 3));
+      // Calculate canvas coordinates for the center of the screen
+      startX = (centerX - pan.x) / (currentCellSize * zoom) - 1;
+      startY = (centerY - pan.y) / (currentCellSize * zoom) - 1.5;
     }
 
     // Add slight offset for multiple cards added in the same spot
@@ -178,10 +173,8 @@ export default function App() {
     setCards((prev) =>
       prev.map((c) => {
         if (selectedIds.has(c.id)) {
-          let newX = c.x + delta.x / currentCellSize;
-          let newY = c.y + delta.y / currentCellSize;
-          newX = Math.max(0, Math.min(newX, GRID_WIDTH - (c.rotationMode === 'horizontal' ? c.height : c.width)));
-          newY = Math.max(0, Math.min(newY, GRID_HEIGHT - (c.rotationMode === 'horizontal' ? c.width : c.height)));
+          let newX = c.x + delta.x / (currentCellSize * zoom);
+          let newY = c.y + delta.y / (currentCellSize * zoom);
           return { ...c, x: newX, y: newY };
         }
         return c;
@@ -446,55 +439,85 @@ export default function App() {
             />
           </div>
 
-          <div className="relative flex-1 flex flex-col overflow-hidden">
-            <main id="main-scroll-area" className="flex-1 overflow-auto relative z-0">
-              <div className="min-w-full min-h-full w-max h-max p-4 md:p-8 flex">
-                <div className="m-auto">
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragStart={handleDragStart}
-                    onDragMove={handleDragMove}
-                    onDragEnd={handleDragEnd}
-                    modifiers={[restrictToWindowEdges]}
-                  >
-                    <GridCanvas
-                      cards={cards}
-                      cellSize={currentCellSize}
-                      width={GRID_WIDTH}
-                      height={GRID_HEIGHT}
-                      onUpdateCard={handleUpdateCard}
-                      onDeleteCard={handleDeleteCard}
-                      selectedIds={selectedIds}
-                      activeId={activeId}
-                      dragDelta={dragDelta}
-                      onCardClick={handleCardClick}
-                      onClearSelection={handleClearSelection}
-                      onSetSelection={handleSetSelection}
-                    />
-                  </DndContext>
-                </div>
-              </div>
-            </main>
+          <div className="relative flex-1 flex flex-col overflow-hidden bg-slate-50" id="canvas-container">
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragMove={handleDragMove}
+              onDragEnd={handleDragEnd}
+            >
+              <GridCanvas
+                cards={cards}
+                cellSize={currentCellSize}
+                onUpdateCard={handleUpdateCard}
+                onDeleteCard={handleDeleteCard}
+                selectedIds={selectedIds}
+                activeId={activeId}
+                dragDelta={dragDelta}
+                onCardClick={handleCardClick}
+                onClearSelection={handleClearSelection}
+                onSetSelection={handleSetSelection}
+                zoom={zoom}
+                setZoom={setZoom}
+                pan={pan}
+                setPan={setPan}
+              />
+            </DndContext>
 
-            {/* Zoom Controls */}
-            <div className="absolute bottom-6 right-6 flex flex-col gap-2 z-10">
+            {/* Zoom Controls (Desktop Only) */}
+            <div className="hidden md:flex absolute bottom-6 right-6 flex-col gap-2 z-10">
               <button 
-                onClick={() => setZoom(z => Math.min(z + 0.2, 2))}
+                onClick={() => {
+                  const newZoom = Math.min(zoom + 0.2, 3);
+                  const container = document.getElementById('canvas-container');
+                  if (container) {
+                    const rect = container.getBoundingClientRect();
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const scaleRatio = newZoom / zoom;
+                    setPan(p => ({
+                      x: centerX - (centerX - p.x) * scaleRatio,
+                      y: centerY - (centerY - p.y) * scaleRatio
+                    }));
+                  }
+                  setZoom(newZoom);
+                }}
                 className="p-3 bg-white text-slate-700 hover:bg-slate-50 rounded-full shadow-lg border border-slate-200 transition-colors"
                 title="Zoom In"
               >
                 <ZoomIn size={20} />
               </button>
               <button 
-                onClick={() => setZoom(1)}
+                onClick={() => {
+                  const container = document.getElementById('canvas-container');
+                  if (container) {
+                    const rect = container.getBoundingClientRect();
+                    setPan({ x: rect.width / 2, y: rect.height / 2 });
+                  }
+                  setZoom(1);
+                }}
                 className="p-3 bg-white text-slate-700 hover:bg-slate-50 rounded-full shadow-lg border border-slate-200 transition-colors"
                 title="Reset Zoom"
               >
                 <Maximize size={20} />
               </button>
               <button 
-                onClick={() => setZoom(z => Math.max(z - 0.2, 0.4))}
+                onClick={() => {
+                  const newZoom = Math.max(zoom - 0.2, 0.1);
+                  const container = document.getElementById('canvas-container');
+                  if (container) {
+                    const rect = container.getBoundingClientRect();
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const scaleRatio = newZoom / zoom;
+                    setPan(p => ({
+                      x: centerX - (centerX - p.x) * scaleRatio,
+                      y: centerY - (centerY - p.y) * scaleRatio
+                    }));
+                  }
+                  setZoom(newZoom);
+                }}
                 className="p-3 bg-white text-slate-700 hover:bg-slate-50 rounded-full shadow-lg border border-slate-200 transition-colors"
                 title="Zoom Out"
               >

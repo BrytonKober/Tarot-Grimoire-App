@@ -16,10 +16,11 @@ interface CardPlaceholderProps {
   onUpdate: (id: string, updates: Partial<Placeholder>) => void;
   onDelete: (id: string) => void;
   onClick: (e: React.MouseEvent) => void;
+  zoom: number;
 }
 
 export function CardPlaceholder({ 
-  card, cellSize, isSelected, isActive, dragDelta, onUpdate, onDelete, onClick 
+  card, cellSize, isSelected, isActive, dragDelta, onUpdate, onDelete, onClick, zoom 
 }: CardPlaceholderProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: card.id,
@@ -34,12 +35,12 @@ export function CardPlaceholder({
   let finalY = card.y * cellSize;
 
   if (isSelected && !isActive && dragDelta) {
-    finalX += dragDelta.x;
-    finalY += dragDelta.y;
+    finalX += dragDelta.x / zoom;
+    finalY += dragDelta.y / zoom;
   }
 
   const style = {
-    transform: CSS.Translate.toString(transform),
+    transform: transform ? `translate3d(${transform.x / zoom}px, ${transform.y / zoom}px, 0)` : undefined,
     left: finalX,
     top: finalY,
     width: card.rotationMode === 'horizontal' ? card.height * cellSize : card.width * cellSize,
@@ -60,7 +61,7 @@ export function CardPlaceholder({
       ref={setNodeRef}
       style={style}
       className={cn(
-        "absolute touch-none group",
+        "absolute touch-none group card-element",
         isDragging ? "opacity-80 cursor-grabbing" : "cursor-grab"
       )}
       onMouseEnter={() => setShowMenu(true)}
