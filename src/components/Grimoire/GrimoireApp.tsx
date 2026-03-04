@@ -2,11 +2,10 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { GrimoirePage, FloatingImage } from '../../lib/db';
 import { getPages, putPage, deletePage } from '../../lib/data';
-import { useAuth } from '../../contexts/AuthContext';
 import { Editor } from './Editor';
 import { Sidebar } from './Sidebar';
 import { FloatingImageComponent } from './FloatingImageComponent';
-import { ImageIcon, Eye, Edit3 } from 'lucide-react';
+import { Eye, Edit3 } from 'lucide-react';
 import { cn, extractTextFromNode } from '../../lib/utils';
 
 export function GrimoireApp() {
@@ -15,12 +14,10 @@ export function GrimoireApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [viewMode, setViewMode] = useState(false);
-  const { loading, user } = useAuth();
 
   // Load pages on mount
   useEffect(() => {
     async function loadPages() {
-      if (loading) return;
       const sorted = await getPages();
       setPages(sorted);
       if (sorted.length > 0 && !activePageId) {
@@ -30,7 +27,7 @@ export function GrimoireApp() {
       }
     }
     loadPages();
-  }, [loading, user]);
+  }, []);
 
   const handleCreatePage = async () => {
     const newPage: GrimoirePage = {

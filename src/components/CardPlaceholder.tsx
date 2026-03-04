@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 import { Placeholder } from '../types';
 import { cn } from '../lib/utils';
 import { Settings, Trash2, ArrowUp, ArrowDown, RotateCw } from 'lucide-react';

@@ -13,7 +13,6 @@ import {
   closestCenter,
   DragStartEvent,
 } from '@dnd-kit/core';
-import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { Menu, BookOpen, LayoutGrid, Save, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 
 import { Placeholder, Spread, TarotCard } from './types';
